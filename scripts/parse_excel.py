@@ -172,12 +172,15 @@ class AttestationDataParser:
 
         return df_data, indicator_columns
 
-    def parse_results_sheet(self) -> pd.DataFrame:
+    def parse_results_sheet(self, directions=['Суспільний', 'Аграрно-ветеринарний']) -> pd.DataFrame:
         """
         Парсинг вкладки 'Результати' з підсумковими оцінками
 
+        Args:
+            directions: Список наукових напрямів для фільтрації
+
         Returns:
-            DataFrame з результатами атестації
+            DataFrame з результатами атестації для зазначених напрямів
         """
         print("\n📊 Парсинг вкладки 'Результати'...")
 
@@ -185,16 +188,25 @@ class AttestationDataParser:
             raise KeyError("Вкладка 'Результати' не знайдена")
 
         df = self.sheets['Результати'].copy()
-        print(f"  ✓ Завантажено {len(df)} записів про результати атестації")
+
+        # Фільтруємо лише потрібні напрями
+        if 'Напрям' in df.columns:
+            df = df[df['Напрям'].isin(directions)]
+            print(f"  ✓ Відфільтровано {len(df)} записів для напрямів: {', '.join(directions)}")
+        else:
+            print(f"  ⚠ Колонка 'Напрям' не знайдена, завантажено всі {len(df)} записів")
 
         return df
 
-    def parse_detali_sheet(self) -> pd.DataFrame:
+    def parse_detali_sheet(self, directions=['Суспільний', 'Аграрно-ветеринарний']) -> pd.DataFrame:
         """
         Парсинг вкладки 'Деталі 3.0' з деталізованими даними
 
+        Args:
+            directions: Список наукових напрямів для фільтрації
+
         Returns:
-            DataFrame з деталями по індикаторах
+            DataFrame з деталями по індикаторах для зазначених напрямів
         """
         print("\n🔍 Парсинг вкладки 'Деталі 3.0'...")
 
@@ -203,16 +215,25 @@ class AttestationDataParser:
             return None
 
         df = self.sheets['Деталі 3.0'].copy()
-        print(f"  ✓ Завантажено {len(df)} деталізованих записів")
+
+        # Фільтруємо лише потрібні напрями
+        if 'Напрям' in df.columns:
+            df = df[df['Напрям'].isin(directions)]
+            print(f"  ✓ Відфільтровано {len(df)} деталізованих записів для напрямів: {', '.join(directions)}")
+        else:
+            print(f"  ⚠ Колонка 'Напрям' не знайдена, завантажено всі {len(df)} записів")
 
         return df
 
-    def parse_dynamika_sheet(self) -> pd.DataFrame:
+    def parse_dynamika_sheet(self, directions=['Суспільний', 'Аграрно-ветеринарний']) -> pd.DataFrame:
         """
         Парсинг вкладки 'Динаміка' з часовими рядами 2019-2023
 
+        Args:
+            directions: Список наукових напрямів для фільтрації
+
         Returns:
-            DataFrame з динамікою показників
+            DataFrame з динамікою показників для зазначених напрямів
         """
         print("\n📈 Парсинг вкладки 'Динаміка'...")
 
@@ -221,7 +242,41 @@ class AttestationDataParser:
             return None
 
         df = self.sheets['Динаміка'].copy()
-        print(f"  ✓ Завантажено {len(df)} записів динаміки")
+
+        # Фільтруємо лише потрібні напрями
+        direction_col = 'Науковий напрям * Рівень 0'
+        if direction_col in df.columns:
+            df = df[df[direction_col].isin(directions)]
+            print(f"  ✓ Відфільтровано {len(df)} записів динаміки для напрямів: {', '.join(directions)}")
+        else:
+            print(f"  ⚠ Колонка '{direction_col}' не знайдена, завантажено всі {len(df)} записів")
+
+        return df
+
+    def parse_medians_sheet(self, directions=['Суспільний', 'Аграрно-ветеринарний']) -> pd.DataFrame:
+        """
+        Парсинг вкладки 'Мадіани' з медіанами показників
+
+        Args:
+            directions: Список наукових напрямів для фільтрації
+
+        Returns:
+            DataFrame з медіанами для зазначених напрямів
+        """
+        print("\n📊 Парсинг вкладки 'Мадіани'...")
+
+        if 'Мадіани' not in self.sheets:
+            print("  ⚠ Вкладка 'Мадіани' не знайдена")
+            return None
+
+        df = self.sheets['Мадіани'].copy()
+
+        # Фільтруємо лише потрібні напрями
+        if 'Напрям' in df.columns:
+            df = df[df['Напрям'].isin(directions)]
+            print(f"  ✓ Відфільтровано {len(df)} медіан для напрямів: {', '.join(directions)}")
+        else:
+            print(f"  ⚠ Колонка 'Напрям' не знайдена, завантажено всі {len(df)} записів")
 
         return df
 
@@ -339,52 +394,64 @@ class AttestationDataParser:
         else:
             validation['warnings'].append("Не знайдено всіх колонок для валідації формули")
 
-    def consolidate_data(self) -> pd.DataFrame:
+    def consolidate_data(self, directions=['Суспільний', 'Аграрно-ветеринарний']) -> Dict:
         """
         Консолідація всіх даних у єдину структуру
 
+        Args:
+            directions: Список наукових напрямів для обробки
+
         Returns:
-            Консолідований DataFrame
+            Словник з консолідованими даними
         """
         print("\n🔄 Консолідація даних...")
 
-        dovidnyky_df, indicator_columns = self.parse_dovidnyky_sheet()
-        results = self.parse_results_sheet()
-        detali = self.parse_detali_sheet()
-        dynamika = self.parse_dynamika_sheet()
+        # Завантажуємо дані з різних аркушів
+        results_df = self.parse_results_sheet(directions)
+        detali_df = self.parse_detali_sheet(directions)
+        medians_df = self.parse_medians_sheet(directions)
+        dynamika_df = self.parse_dynamika_sheet(directions)
 
-        # Валідація методики
-        self.validate_methodology(indicator_columns, dovidnyky_df, results)
+        # Формуємо консолідовану структуру
+        self.consolidated_data = {
+            'results': results_df,
+            'detali': detali_df,
+            'medians': medians_df,
+            'dynamika': dynamika_df
+        }
 
-        # Зберігаємо маппінг індикаторів для подальшого використання
-        self.indicator_columns = indicator_columns
-
-        # Об'єднання основних таблиць
-        # Використовуємо таблицю Довідники як основу, бо там є всі індикатори
-        self.consolidated_data = dovidnyky_df
-
-        print(f"  ✓ Консолідовано {len(self.consolidated_data)} ЗВО")
+        print(f"  ✓ Консолідовано:")
+        print(f"    - Результати: {len(results_df)} установ")
+        if detali_df is not None:
+            print(f"    - Деталі: {len(detali_df)} деталізованих записів")
+        if medians_df is not None:
+            print(f"    - Медіани: {len(medians_df)} значень медіан")
+        if dynamika_df is not None:
+            print(f"    - Динаміка: {len(dynamika_df)} часових записів")
 
         return self.consolidated_data
 
-    def export_to_csv(self, output_path: str):
+    def export_to_csv(self, output_dir: str):
         """
-        Експорт консолідованих даних у CSV
+        Експорт консолідованих даних у CSV файли
 
         Args:
-            output_path: Шлях до вихідного CSV файлу
+            output_dir: Директорія для збереження CSV файлів
         """
         if self.consolidated_data is None:
             raise ValueError("Спочатку виконайте консолідацію даних")
 
-        print(f"\n💾 Експорт у CSV: {output_path}")
+        print(f"\n💾 Експорт у CSV: {output_dir}")
 
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.consolidated_data.to_csv(output_path, index=False, encoding='utf-8-sig')
-
-        print(f"  ✓ Збережено {len(self.consolidated_data)} записів")
+        # Експортуємо кожен DataFrame окремо
+        for name, df in self.consolidated_data.items():
+            if df is not None and len(df) > 0:
+                output_path = output_dir / f"{name}.csv"
+                df.to_csv(output_path, index=False, encoding='utf-8-sig')
+                print(f"  ✓ {name}.csv: {len(df)} записів")
 
     def export_to_json(self, output_dir: str):
         """
@@ -397,6 +464,9 @@ class AttestationDataParser:
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.consolidated_data is None:
+            raise ValueError("Спочатку виконайте консолідацію даних")
 
         # 1. Метадані методики
         methodology = {
@@ -413,45 +483,64 @@ class AttestationDataParser:
             json.dump(methodology, f, ensure_ascii=False, indent=2)
         print("  ✓ methodology.json")
 
-        # 2. Результати валідації
-        if self.validation_results:
-            with open(output_dir / 'validation.json', 'w', encoding='utf-8') as f:
-                json.dump(self.validation_results, f, ensure_ascii=False, indent=2)
-            print("  ✓ validation.json")
-
-        # 3. Консолідовані результати (вибірка для прикладу)
-        if self.consolidated_data is not None:
-            # Конвертуємо DataFrame в список словників
-            results_dict = self.consolidated_data.to_dict('records')
+        # 2. Основні результати атестації (всі установи)
+        results_df = self.consolidated_data['results']
+        if results_df is not None and len(results_df) > 0:
+            # Конвертуємо NaN у None для коректного JSON
+            results_dict = results_df.replace({np.nan: None}).to_dict('records')
 
             with open(output_dir / 'all_results.json', 'w', encoding='utf-8') as f:
                 json.dump(results_dict, f, ensure_ascii=False, indent=2)
-            print(f"  ✓ all_results.json ({len(results_dict)} записів)")
+            print(f"  ✓ all_results.json ({len(results_dict)} установ)")
 
-        # 4. Статистика по науковим напрямам
-        if 'Результати' in self.sheets:
-            results_df = self.sheets['Результати']
+        # 3. Деталізовані дані по індикаторах
+        detali_df = self.consolidated_data['detali']
+        if detali_df is not None and len(detali_df) > 0:
+            detali_dict = detali_df.replace({np.nan: None}).to_dict('records')
 
-            # Перевірка наявності колонки з науковим напрямом
-            direction_col = None
-            for col in results_df.columns:
-                if 'напрям' in str(col).lower() or 'direction' in str(col).lower():
-                    direction_col = col
-                    break
+            with open(output_dir / 'detali.json', 'w', encoding='utf-8') as f:
+                json.dump(detali_dict, f, ensure_ascii=False, indent=2)
+            print(f"  ✓ detali.json ({len(detali_dict)} деталізованих записів)")
 
-            if direction_col:
-                stats_by_direction = {}
-                for direction_id, direction_name in self.SCIENCE_DIRECTIONS.items():
-                    direction_data = results_df[results_df[direction_col] == direction_id]
-                    if len(direction_data) > 0:
-                        stats_by_direction[direction_name] = {
-                            'count': len(direction_data),
-                            'direction_id': direction_id
-                        }
+        # 4. Медіани показників
+        medians_df = self.consolidated_data['medians']
+        if medians_df is not None and len(medians_df) > 0:
+            medians_dict = medians_df.replace({np.nan: None}).to_dict('records')
 
-                with open(output_dir / 'stats_by_direction.json', 'w', encoding='utf-8') as f:
-                    json.dump(stats_by_direction, f, ensure_ascii=False, indent=2)
-                print("  ✓ stats_by_direction.json")
+            with open(output_dir / 'medians.json', 'w', encoding='utf-8') as f:
+                json.dump(medians_dict, f, ensure_ascii=False, indent=2)
+            print(f"  ✓ medians.json ({len(medians_dict)} значень медіан)")
+
+        # 5. Динаміка показників (часові ряди)
+        dynamika_df = self.consolidated_data['dynamika']
+        if dynamika_df is not None and len(dynamika_df) > 0:
+            dynamika_dict = dynamika_df.replace({np.nan: None}).to_dict('records')
+
+            with open(output_dir / 'dynamika.json', 'w', encoding='utf-8') as f:
+                json.dump(dynamika_dict, f, ensure_ascii=False, indent=2)
+            print(f"  ✓ dynamika.json ({len(dynamika_dict)} часових записів)")
+
+        # 6. Статистика по науковим напрямам
+        if results_df is not None and len(results_df) > 0 and 'Напрям' in results_df.columns:
+            stats_by_direction = {}
+            for direction in results_df['Напрям'].unique():
+                direction_data = results_df[results_df['Напрям'] == direction]
+
+                # Підрахунок установ за групами
+                groups_count = {}
+                if 'Група' in direction_data.columns:
+                    for group in direction_data['Група'].unique():
+                        if pd.notna(group):
+                            groups_count[group] = int(direction_data[direction_data['Група'] == group].shape[0])
+
+                stats_by_direction[direction] = {
+                    'total': int(len(direction_data)),
+                    'groups': groups_count
+                }
+
+            with open(output_dir / 'stats_by_direction.json', 'w', encoding='utf-8') as f:
+                json.dump(stats_by_direction, f, ensure_ascii=False, indent=2)
+            print("  ✓ stats_by_direction.json")
 
         print(f"\n✅ Генерація JSON завершена: {output_dir}")
 
@@ -472,23 +561,37 @@ class AttestationDataParser:
         report.append(f"📊 Вкладок оброблено: {len(self.sheets)}")
         report.append("")
 
-        if self.validation_results:
-            report.append("✅ РЕЗУЛЬТАТИ ВАЛІДАЦІЇ:")
-            report.append(f"  • Індикаторів знайдено: {len(self.validation_results['indicators_found'])}/37")
-            report.append(f"  • Сума Ki коректна: {self.validation_results['ki_sum_valid']}")
+        if self.consolidated_data:
+            report.append("📈 КОНСОЛІДОВАНІ ДАНІ:")
+            results_df = self.consolidated_data.get('results')
+            if results_df is not None:
+                report.append(f"  • Результати: {len(results_df)} установ")
 
-            if self.validation_results['indicators_missing']:
-                report.append(f"  ⚠ Відсутні індикатори: {', '.join(self.validation_results['indicators_missing'])}")
+                # Статистика по напрямах
+                if 'Напрям' in results_df.columns:
+                    report.append("\n  📊 За науковими напрямами:")
+                    for direction in sorted(results_df['Напрям'].unique()):
+                        count = len(results_df[results_df['Напрям'] == direction])
+                        report.append(f"    - {direction}: {count} установ")
 
-            if self.validation_results['errors']:
-                report.append("\n  ❌ ПОМИЛКИ:")
-                for error in self.validation_results['errors']:
-                    report.append(f"    - {error}")
+                        # Статистика по групах
+                        if 'Група' in results_df.columns:
+                            direction_data = results_df[results_df['Напрям'] == direction]
+                            for group in sorted(direction_data['Група'].dropna().unique()):
+                                group_count = len(direction_data[direction_data['Група'] == group])
+                                report.append(f"      • Група {group}: {group_count} установ")
 
-            if self.validation_results['warnings']:
-                report.append("\n  ⚠ ПОПЕРЕДЖЕННЯ:")
-                for warning in self.validation_results['warnings']:
-                    report.append(f"    - {warning}")
+            detali_df = self.consolidated_data.get('detali')
+            if detali_df is not None:
+                report.append(f"\n  • Деталі: {len(detali_df)} деталізованих записів")
+
+            medians_df = self.consolidated_data.get('medians')
+            if medians_df is not None:
+                report.append(f"  • Медіани: {len(medians_df)} значень")
+
+            dynamika_df = self.consolidated_data.get('dynamika')
+            if dynamika_df is not None:
+                report.append(f"  • Динаміка: {len(dynamika_df)} часових записів")
 
         report.append("")
         report.append("=" * 80)
@@ -502,10 +605,15 @@ def main():
     # Шляхи до файлів
     base_dir = Path(__file__).parent.parent
     excel_path = base_dir / "data" / "Оголошення результатів.xlsx"
-    csv_output = base_dir / "data" / "consolidated_data.csv"
+    csv_output_dir = base_dir / "data" / "csv"
     json_output_dir = base_dir / "data" / "json"
 
+    # Напрями для обробки (лише Суспільний та Аграрно-ветеринарний)
+    directions = ['Суспільний', 'Аграрно-ветеринарний']
+
     print("🚀 ПОЧАТОК ПАРСИНГУ ДАНИХ АТЕСТАЦІЇ ЗВО")
+    print("=" * 80)
+    print(f"📌 Обробка напрямів: {', '.join(directions)}")
     print("=" * 80)
 
     try:
@@ -515,11 +623,11 @@ def main():
         # Завантаження всіх вкладок
         parser.load_all_sheets()
 
-        # Консолідація даних
-        parser.consolidate_data()
+        # Консолідація даних для зазначених напрямів
+        parser.consolidate_data(directions)
 
         # Експорт у CSV
-        parser.export_to_csv(str(csv_output))
+        parser.export_to_csv(str(csv_output_dir))
 
         # Генерація JSON файлів
         parser.export_to_json(str(json_output_dir))
@@ -531,6 +639,8 @@ def main():
 
     except Exception as e:
         print(f"\n❌ ПОМИЛКА: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise
 
 

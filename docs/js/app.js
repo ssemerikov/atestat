@@ -19,7 +19,7 @@ class App {
 
         this.data = null;
         this.currentInstitution = 'Криворізький державний педагогічний університет';
-        this.currentDirection = 0;
+        this.currentDirection = null; // null means all directions, or use "Суспільний", "Аграрно-ветеринарний"
         this.selectedCompareInstitutions = [];
 
         this.init();
@@ -90,7 +90,7 @@ class App {
 
         if (scienceDirection) {
             scienceDirection.addEventListener('change', (e) => {
-                this.currentDirection = parseInt(e.target.value);
+                this.currentDirection = e.target.value || null;
             });
         }
     }

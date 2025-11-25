@@ -9,7 +9,9 @@ class DataLoader {
             allResults: null,
             methodology: null,
             statsByDirection: null,
-            validation: null
+            detali: null,
+            medians: null,
+            dynamika: null
         };
         this.baseURL = './data/';
     }
@@ -19,18 +21,22 @@ class DataLoader {
      */
     async loadAll() {
         try {
-            const [allResults, methodology, statsByDirection, validation] = await Promise.all([
+            const [allResults, methodology, statsByDirection, detali, medians, dynamika] = await Promise.all([
                 this.loadAllResults(),
                 this.loadMethodology(),
                 this.loadStatsByDirection(),
-                this.loadValidation()
+                this.loadDetali(),
+                this.loadMedians(),
+                this.loadDynamika()
             ]);
 
             return {
                 allResults,
                 methodology,
                 statsByDirection,
-                validation
+                detali,
+                medians,
+                dynamika
             };
         } catch (error) {
             console.error('Error loading data:', error);
@@ -91,20 +97,54 @@ class DataLoader {
     }
 
     /**
-     * Load validation data
+     * Load detali data (detailed indicators)
      */
-    async loadValidation() {
-        if (this.cache.validation) {
-            return this.cache.validation;
+    async loadDetali() {
+        if (this.cache.detali) {
+            return this.cache.detali;
         }
 
-        const response = await fetch(`${this.baseURL}validation.json`);
+        const response = await fetch(`${this.baseURL}detali.json`);
         if (!response.ok) {
-            throw new Error('Failed to load validation.json');
+            throw new Error('Failed to load detali.json');
         }
 
-        this.cache.validation = await response.json();
-        return this.cache.validation;
+        this.cache.detali = await response.json();
+        return this.cache.detali;
+    }
+
+    /**
+     * Load medians data
+     */
+    async loadMedians() {
+        if (this.cache.medians) {
+            return this.cache.medians;
+        }
+
+        const response = await fetch(`${this.baseURL}medians.json`);
+        if (!response.ok) {
+            throw new Error('Failed to load medians.json');
+        }
+
+        this.cache.medians = await response.json();
+        return this.cache.medians;
+    }
+
+    /**
+     * Load dynamika data (time series)
+     */
+    async loadDynamika() {
+        if (this.cache.dynamika) {
+            return this.cache.dynamika;
+        }
+
+        const response = await fetch(`${this.baseURL}dynamika.json`);
+        if (!response.ok) {
+            throw new Error('Failed to load dynamika.json');
+        }
+
+        this.cache.dynamika = await response.json();
+        return this.cache.dynamika;
     }
 
     /**
@@ -124,7 +164,9 @@ class DataLoader {
             return processed;
         }).filter(item => {
             // Filter out completely empty rows
-            return item['Назва установи / Закладу вищої освіти'] !== null;
+            const nameField = item['Назва Установи / Середньорічні показники'] ||
+                             item['Назва установи / Закладу вищої освіти'];
+            return nameField !== null;
         });
     }
 
@@ -134,7 +176,8 @@ class DataLoader {
     getInstitutions(data) {
         const institutions = new Set();
         data.allResults.forEach(item => {
-            const name = item['Назва установи / Закладу вищої освіти'];
+            const name = item['Назва Установи / Середньорічні показники'] ||
+                        item['Назва установи / Закладу вищої освіти'];
             if (name && name.trim()) {
                 institutions.add(name.trim());
             }
@@ -145,16 +188,21 @@ class DataLoader {
     /**
      * Get data for specific institution
      */
-    getInstitutionData(allResults, institutionName, direction = 0) {
+    getInstitutionData(allResults, institutionName, directionName = null) {
         const results = allResults.filter(item => {
-            const nameMatch = item['Назва установи / Закладу вищої освіти'] === institutionName;
-            if (direction === 0) {
+            const name = item['Назва Установи / Середньорічні показники'] ||
+                        item['Назва установи / Закладу вищої освіти'];
+            const nameMatch = name === institutionName;
+
+            if (!directionName) {
                 return nameMatch;
             }
-            return nameMatch && item['Напрям'] == direction;
+
+            // Match by direction name (e.g., "Суспільний", "Аграрно-ветеринарний")
+            return nameMatch && item['Напрям'] === directionName;
         });
 
-        return results;
+        return results.length > 0 ? results[0] : null;
     }
 
     /**
@@ -209,52 +257,89 @@ class DataLoader {
     }
 
     /**
-     * Get median values for all indicators
+     * Get median values for indicators from medians.json
      */
-    getMedianValues(allResults, direction = 0) {
-        const filteredData = direction === 0
-            ? allResults
-            : allResults.filter(item => item['Напрям'] == direction);
-
-        const medians = {};
-
-        for (let i = 1; i <= 37; i++) {
-            const indicatorKey = `I${i}`;
-            const dataKey = Object.keys(filteredData[0] || {}).find(key =>
-                key.includes(`Нормований індикатор ${indicatorKey}*`)
-            );
-
-            if (dataKey) {
-                const values = filteredData
-                    .map(item => item[dataKey])
-                    .filter(val => val !== null && !isNaN(val))
-                    .sort((a, b) => a - b);
-
-                if (values.length > 0) {
-                    const mid = Math.floor(values.length / 2);
-                    medians[indicatorKey] = values.length % 2 === 0
-                        ? (values[mid - 1] + values[mid]) / 2
-                        : values[mid];
-                } else {
-                    medians[indicatorKey] = 0;
-                }
-            }
+    getMedianValues(medians, directionName = null, institutionType = null) {
+        if (!medians || medians.length === 0) {
+            return {};
         }
 
-        return medians;
+        // Filter medians by direction and institution type
+        const filteredMedians = medians.filter(item => {
+            let match = true;
+
+            if (directionName && item['Напрям'] !== directionName) {
+                match = false;
+            }
+
+            if (institutionType && item['Тип установи'] !== institutionType) {
+                match = false;
+            }
+
+            return match;
+        });
+
+        // Convert to indicator => median mapping
+        const medianValues = {};
+        filteredMedians.forEach(item => {
+            const indicator = item['Індикатор'];
+            const median = item['Медіана'];
+            if (indicator && median !== null && median !== undefined) {
+                medianValues[indicator] = median;
+            }
+        });
+
+        return medianValues;
+    }
+
+    /**
+     * Get detailed indicator data for institution
+     */
+    getDetaliForInstitution(detali, institutionName) {
+        if (!detali || detali.length === 0) {
+            return [];
+        }
+
+        const nameField = 'Назва установи / Закладу вищої освіти';
+        return detali.filter(item => item[nameField] === institutionName);
+    }
+
+    /**
+     * Get time series data for institution
+     */
+    getDynamikaForInstitution(dynamika, institutionName) {
+        if (!dynamika || dynamika.length === 0) {
+            return [];
+        }
+
+        const nameField = 'Повне найменування наукової установи / закладу вищої освіти *';
+        return dynamika.filter(item => item[nameField] === institutionName);
+    }
+
+    /**
+     * Get time series data by indicator
+     */
+    getDynamikaByIndicator(dynamika, institutionName, indicator) {
+        const institutionData = this.getDynamikaForInstitution(dynamika, institutionName);
+
+        return institutionData
+            .filter(item => item['Показник'] === indicator)
+            .sort((a, b) => (a['Рік'] || 0) - (b['Рік'] || 0));
     }
 
     /**
      * Get top N institutions by score
      */
-    getTopInstitutions(allResults, direction = 0, n = 10) {
-        const filteredData = direction === 0
-            ? allResults
-            : allResults.filter(item => item['Напрям'] == direction);
+    getTopInstitutions(allResults, directionName = null, n = 10) {
+        const filteredData = directionName
+            ? allResults.filter(item => item['Напрям'] === directionName)
+            : allResults;
+
+        const scoreField = 'Попередня атестаційна оцінка';
 
         return filteredData
-            .filter(item => item['Атестаційна оцінка'] !== null)
-            .sort((a, b) => b['Атестаційна оцінка'] - a['Атестаційна оцінка'])
+            .filter(item => item[scoreField] !== null && item[scoreField] !== undefined)
+            .sort((a, b) => (b[scoreField] || 0) - (a[scoreField] || 0))
             .slice(0, n);
     }
 
@@ -266,7 +351,9 @@ class DataLoader {
             allResults: null,
             methodology: null,
             statsByDirection: null,
-            validation: null
+            detali: null,
+            medians: null,
+            dynamika: null
         };
     }
 }
