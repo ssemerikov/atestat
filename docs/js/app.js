@@ -182,7 +182,10 @@ class App {
             }
 
             const mainData = institutionData[0];
-            const indicators = this.dataLoader.getIndicators(mainData);
+            const indicators = this.dataLoader.getIndicators(
+                this.currentInstitution,
+                this.data.detali
+            );
             const blockScores = this.dataLoader.calculateBlockScores(
                 indicators,
                 this.data.methodology
@@ -203,7 +206,7 @@ class App {
 
             // Get median values
             const medianValues = this.dataLoader.getMedianValues(
-                this.data.allResults,
+                this.data.medians,
                 this.currentDirection
             );
 

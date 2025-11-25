@@ -202,30 +202,42 @@ class DataLoader {
             return nameMatch && item['Напрям'] === directionName;
         });
 
-        return results.length > 0 ? results[0] : null;
+        return results;
     }
 
     /**
-     * Get indicators for institution
+     * Get indicators for institution from detali data
      */
-    getIndicators(institutionData) {
+    getIndicators(institutionName, detali) {
         const indicators = {};
 
+        // Initialize all indicators as null
         for (let i = 1; i <= 37; i++) {
-            const indicatorKey = `I${i}`;
-            const normalizedKey = `Нормований індикатор ${indicatorKey}*`;
-
-            // Find the key in the data that contains this indicator
-            const dataKey = Object.keys(institutionData).find(key =>
-                key.includes(`Нормований індикатор ${indicatorKey}*`)
-            );
-
-            if (dataKey) {
-                indicators[indicatorKey] = institutionData[dataKey];
-            } else {
-                indicators[indicatorKey] = null;
-            }
+            indicators[`I${i}`] = null;
         }
+
+        if (!detali || !institutionName) {
+            return indicators;
+        }
+
+        // Get detailed data for this institution
+        const institutionDetali = this.getDetaliForInstitution(detali, institutionName);
+
+        // Extract indicators from detali data
+        institutionDetali.forEach(item => {
+            const indicatorName = item['Назва показника'];
+            if (!indicatorName) return;
+
+            // Extract indicator number (e.g., "І3" from "Кількість молодих вчених П6, І3")
+            const match = indicatorName.match(/[ІI](\d+)/);
+            if (match) {
+                const indicatorKey = `I${match[1]}`;
+                const normalizedValue = item['Нормований індикатор'];
+                if (normalizedValue !== null && normalizedValue !== undefined) {
+                    indicators[indicatorKey] = normalizedValue;
+                }
+            }
+        });
 
         return indicators;
     }
