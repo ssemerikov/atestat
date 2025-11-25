@@ -201,7 +201,8 @@ class App {
                 this.selectedCompareInstitutions,
                 this.currentDirection,
                 this.data.allResults,
-                this.data.methodology
+                this.data.methodology,
+                this.data.detali
             );
 
             // Get median values
@@ -283,7 +284,7 @@ class App {
             </div>
             <div class="info-item">
                 <div class="label">Атестаційна оцінка</div>
-                <div class="value">${data['Атестаційна оцінка'] !== null ? data['Атестаційна оцінка'].toFixed(2) : 'Н/Д'}</div>
+                <div class="value">${data['Попередня атестаційна оцінка'] !== null ? data['Попередня атестаційна оцінка'].toFixed(2) : 'Н/Д'}</div>
             </div>
             <div class="info-item">
                 <div class="label">Група</div>
@@ -292,12 +293,12 @@ class App {
                 </div>
             </div>
             <div class="info-item">
-                <div class="label">Класифікаційна оцінка</div>
-                <div class="value">${data['Класифікаційна оцінка'] !== null ? data['Класифікаційна оцінка'].toFixed(2) : 'Н/Д'}</div>
+                <div class="label">Зважена сумарна оцінка</div>
+                <div class="value">${data['Зважена сумарна оцінка (80/20)'] !== null && data['Зважена сумарна оцінка (80/20)'] !== undefined ? data['Зважена сумарна оцінка (80/20)'].toFixed(2) : 'Н/Д'}</div>
             </div>
             <div class="info-item">
-                <div class="label">Експертна оцінка</div>
-                <div class="value">${data['Експертна оцінка'] !== null ? data['Експертна оцінка'].toFixed(2) : 'Н/Д'}</div>
+                <div class="label">Нормована оцінка</div>
+                <div class="value">${data['Нормована зважена сумарна оцінка'] !== null && data['Нормована зважена сумарна оцінка'] !== undefined ? data['Нормована зважена сумарна оцінка'].toFixed(2) : 'Н/Д'}</div>
             </div>
         `;
     }
@@ -306,6 +307,12 @@ class App {
      * Get science direction name
      */
     getScienceDirectionName(direction) {
+        // If direction is already a string name, return it directly
+        if (typeof direction === 'string') {
+            return direction;
+        }
+
+        // Otherwise, try to map from methodology
         const directions = this.data.methodology.science_directions;
         return directions[direction] || `Напрям ${direction}`;
     }

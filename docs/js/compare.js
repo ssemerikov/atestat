@@ -11,7 +11,7 @@ class Compare {
     /**
      * Get comparison data for selected institutions
      */
-    async getComparisonData(institutionNames, direction, allResults, methodology) {
+    async getComparisonData(institutionNames, direction, allResults, methodology, detali) {
         const compareData = [];
 
         for (const name of institutionNames) {
@@ -25,7 +25,7 @@ class Compare {
 
             if (institutionData.length > 0) {
                 const data = institutionData[0];
-                const indicators = this.dataLoader.getIndicators(data);
+                const indicators = this.dataLoader.getIndicators(name, detali);
                 const blockScores = this.dataLoader.calculateBlockScores(indicators, methodology);
 
                 compareData.push({
@@ -33,7 +33,7 @@ class Compare {
                     data: data,
                     indicators: indicators,
                     blockScores: blockScores,
-                    attestationScore: data['Атестаційна оцінка'],
+                    attestationScore: data['Попередня атестаційна оцінка'],
                     group: data['Група']
                 });
             }
