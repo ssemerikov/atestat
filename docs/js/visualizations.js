@@ -223,7 +223,11 @@ class Visualizations {
 
         // Prepare data
         const indicators = Object.keys(methodology.indicators);
-        const institutions = topInstitutions.map(d => d['Назва установи / Закладу вищої освіти']);
+        const institutions = topInstitutions.map(d =>
+            d['Назва Установи / Середньорічні показники'] ||
+            d['Назва установи / Закладу вищої освіти'] ||
+            'Невідомо'
+        );
 
         const heatmapData = [];
         topInstitutions.forEach((inst, i) => {
@@ -244,6 +248,16 @@ class Visualizations {
                 }
             });
         });
+
+        // If no data found (because all_results doesn't have indicators), show message
+        if (heatmapData.length === 0) {
+            d3.select(container)
+                .append('p')
+                .style('text-align', 'center')
+                .style('color', 'var(--text-secondary)')
+                .text('Дані індикаторів недоступні для цього напряму');
+            return;
+        }
 
         // Set dimensions
         const margin = { top: 80, right: 40, bottom: 100, left: 250 };
@@ -361,6 +375,7 @@ class Visualizations {
             .style('alignment-baseline', 'middle')
             .text(d => {
                 // Truncate long names
+                if (!d) return '';
                 return d.length > 40 ? d.substring(0, 37) + '...' : d;
             });
 
