@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналіз результатів атестації ЗВО України</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/charts.css">
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>Аналіз результатів атестації ЗВО України</h1>
+            <p class="subtitle">Інтерактивна візуалізація ефективності наукової діяльності</p>
+            <div class="theme-controls">
+                <button id="themeToggle" class="btn-icon" aria-label="Перемкнути тему">
+                    <span class="icon-light">☀️</span>
+                    <span class="icon-dark">🌙</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Control Panel -->
+            <section class="control-panel">
+                <div class="card">
+                    <h2>Панель управління</h2>
+
+                    <div class="controls-grid">
+                        <!-- Main Institution Selection -->
+                        <div class="control-group">
+                            <label for="mainInstitution">Основний ЗВО для аналізу</label>
+                            <select id="mainInstitution" class="select-input">
+                                <option value="">Завантаження...</option>
+                            </select>
+                        </div>
+
+                        <!-- Science Direction Selection -->
+                        <div class="control-group">
+                            <label for="scienceDirection">Науковий напрям</label>
+                            <select id="scienceDirection" class="select-input">
+                                <option value="0">Всі напрями</option>
+                                <option value="1">Аграрно-ветеринарний</option>
+                                <option value="2">Гуманітарно-мистецький</option>
+                                <option value="3">Суспільний</option>
+                                <option value="4">Біомедичний</option>
+                                <option value="5">Природничо-математичний</option>
+                                <option value="6">Інженерно-технологічний</option>
+                                <option value="7">Безпековий</option>
+                            </select>
+                        </div>
+
+                        <!-- Comparison Institutions -->
+                        <div class="control-group full-width">
+                            <label for="compareInstitutions">ЗВО для порівняння (2-5 закладів)</label>
+                            <div id="compareContainer" class="compare-container">
+                                <select class="select-input compare-select" data-index="0">
+                                    <option value="">-- Оберіть ЗВО --</option>
+                                </select>
+                                <select class="select-input compare-select" data-index="1">
+                                    <option value="">-- Оберіть ЗВО --</option>
+                                </select>
+                                <select class="select-input compare-select" data-index="2">
+                                    <option value="">-- Оберіть ЗВО --</option>
+                                </select>
+                                <select class="select-input compare-select" data-index="3">
+                                    <option value="">-- Оберіть ЗВО --</option>
+                                </select>
+                                <select class="select-input compare-select" data-index="4">
+                                    <option value="">-- Оберіть ЗВО --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="control-group full-width">
+                            <div class="button-group">
+                                <button id="analyzeBtn" class="btn btn-primary">Аналізувати</button>
+                                <button id="exportPDF" class="btn btn-secondary">Експорт в PDF</button>
+                                <button id="exportExcel" class="btn btn-secondary">Експорт в Excel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Institution Info -->
+            <section id="institutionInfo" class="institution-info hidden">
+                <div class="card">
+                    <h2>Інформація про заклад</h2>
+                    <div id="infoContent" class="info-grid"></div>
+                </div>
+            </section>
+
+            <!-- Visualizations Section -->
+            <section id="visualizations" class="visualizations hidden">
+
+                <!-- Radar Chart - 5 Blocks -->
+                <div class="card">
+                    <h2>Радарна діаграма: 5 блоків індикаторів</h2>
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Bar Chart - All Indicators -->
+                <div class="card">
+                    <h2>Всі 37 індикаторів</h2>
+                    <div class="chart-container chart-container-large">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Scatter Plot - Position vs Median -->
+                <div class="card">
+                    <h2>Позиція відносно медіани</h2>
+                    <div id="scatterPlot" class="chart-container"></div>
+                </div>
+
+                <!-- Heatmap - Top 10 Institutions -->
+                <div class="card">
+                    <h2>Теплова карта: Топ-10 ЗВО</h2>
+                    <div id="heatmap" class="chart-container-heatmap"></div>
+                </div>
+
+                <!-- Detailed Table -->
+                <div class="card">
+                    <h2>Детальна таблиця показників</h2>
+                    <div class="table-responsive">
+                        <table id="detailsTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Індикатор</th>
+                                    <th>Назва</th>
+                                    <th>Значення</th>
+                                    <th>Нормоване значення</th>
+                                    <th>Вага (Кi)</th>
+                                    <th>Внесок</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recommendations -->
+                <div class="card">
+                    <h2>Автоматичні рекомендації</h2>
+                    <div id="recommendations" class="recommendations-container"></div>
+                </div>
+
+            </section>
+
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="loading-indicator hidden">
+                <div class="spinner"></div>
+                <p>Завантаження даних...</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="error-message hidden"></div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 Аналіз атестації ЗВО України</p>
+            <p>Дані оновлено: <span id="dataUpdateDate">-</span></p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Modules -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

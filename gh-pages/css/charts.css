@@ -1,0 +1,422 @@
+/* ==================== Chart Containers ==================== */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    margin: var(--spacing-md) 0;
+}
+
+.chart-container-large {
+    height: 600px;
+}
+
+.chart-container-heatmap {
+    position: relative;
+    width: 100%;
+    min-height: 500px;
+    overflow-x: auto;
+}
+
+/* ==================== Canvas Styling ==================== */
+canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* ==================== D3 Visualizations ==================== */
+
+/* Scatter Plot */
+.scatter-plot {
+    width: 100%;
+    height: 100%;
+}
+
+.scatter-plot .dot {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.scatter-plot .dot:hover {
+    r: 8;
+    stroke-width: 2;
+}
+
+.scatter-plot .axis-label {
+    font-size: 14px;
+    font-weight: 600;
+    fill: var(--text-primary);
+}
+
+.scatter-plot .median-line {
+    stroke: var(--danger);
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+}
+
+.scatter-plot .grid-line {
+    stroke: var(--border-color);
+    stroke-width: 1;
+    opacity: 0.3;
+}
+
+/* Heatmap */
+.heatmap {
+    font-family: inherit;
+}
+
+.heatmap .cell {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.heatmap .cell:hover {
+    stroke: var(--text-primary);
+    stroke-width: 2;
+}
+
+.heatmap .axis text {
+    font-size: 12px;
+    fill: var(--text-primary);
+}
+
+.heatmap .axis-label {
+    font-size: 14px;
+    font-weight: 600;
+    fill: var(--text-primary);
+}
+
+.heatmap .institution-label {
+    cursor: pointer;
+    fill: var(--text-primary);
+}
+
+.heatmap .institution-label:hover {
+    fill: var(--primary);
+    font-weight: 600;
+}
+
+.heatmap .indicator-label {
+    fill: var(--text-secondary);
+}
+
+/* Tooltip */
+.chart-tooltip {
+    position: absolute;
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-hover);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    max-width: 300px;
+}
+
+.chart-tooltip.visible {
+    opacity: 1;
+}
+
+.chart-tooltip .tooltip-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.chart-tooltip .tooltip-content {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.chart-tooltip .tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 0.25rem 0;
+}
+
+.chart-tooltip .tooltip-label {
+    font-weight: 500;
+}
+
+.chart-tooltip .tooltip-value {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Legend */
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    justify-content: center;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-sm);
+}
+
+/* Chart Controls */
+.chart-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.chart-control-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 2px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.875rem;
+}
+
+.chart-control-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.chart-control-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+/* ==================== Chart Specific Styles ==================== */
+
+/* Radar Chart Customization */
+.radar-chart-container {
+    position: relative;
+}
+
+.radar-chart-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+.radar-info-item {
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.radar-info-item .block-name {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.radar-info-item .block-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.radar-info-item .block-change {
+    font-size: 0.75rem;
+    margin-top: var(--spacing-xs);
+}
+
+.block-change.positive {
+    color: var(--success);
+}
+
+.block-change.negative {
+    color: var(--danger);
+}
+
+/* Bar Chart Customization */
+.bar-chart-container {
+    position: relative;
+}
+
+.bar-chart-filter {
+    margin-bottom: var(--spacing-md);
+}
+
+/* ==================== Heatmap Color Scale ==================== */
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    justify-content: center;
+}
+
+.heatmap-scale {
+    display: flex;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.heatmap-scale-item {
+    width: 40px;
+    height: 100%;
+}
+
+.heatmap-scale-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* ==================== Comparison View ==================== */
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.comparison-card {
+    background: var(--bg-tertiary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 2px solid transparent;
+    transition: var(--transition);
+}
+
+.comparison-card.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.comparison-card:hover {
+    border-color: var(--primary);
+}
+
+.comparison-card .institution-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.comparison-card .score-display {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin: var(--spacing-sm) 0;
+}
+
+.comparison-card .group-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.group-badge.group-a {
+    background: var(--success);
+    color: white;
+}
+
+.group-badge.group-b {
+    background: var(--info);
+    color: white;
+}
+
+.group-badge.group-c {
+    background: var(--warning);
+    color: white;
+}
+
+.group-badge.group-d {
+    background: var(--danger);
+    color: white;
+}
+
+/* ==================== Responsive Charts ==================== */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 300px;
+    }
+
+    .chart-container-large {
+        height: 400px;
+    }
+
+    .chart-legend {
+        font-size: 0.75rem;
+    }
+
+    .legend-color {
+        width: 12px;
+        height: 12px;
+    }
+
+    .comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .chart-container {
+        height: 250px;
+    }
+
+    .chart-container-large {
+        height: 350px;
+    }
+
+    .chart-controls {
+        flex-direction: column;
+    }
+
+    .chart-control-btn {
+        width: 100%;
+    }
+}
+
+/* ==================== Animation ==================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chart-container.animate {
+    animation: fadeIn 0.5s ease;
+}
+
+/* ==================== Accessibility ==================== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
