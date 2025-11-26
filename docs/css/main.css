@@ -439,6 +439,16 @@ p {
     margin: var(--spacing-xs) 0;
 }
 
+.footer-links {
+    list-style: none;
+    padding: 0;
+    margin: var(--spacing-md) 0;
+}
+
+.footer-links li {
+    margin-bottom: var(--spacing-sm);
+}
+
 /* ==================== Responsive Design ==================== */
 @media (max-width: 768px) {
     h1 {

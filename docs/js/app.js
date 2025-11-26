@@ -211,12 +211,76 @@ class App {
                 this.currentDirection
             );
 
-            // Get top institutions with their indicators
+            // Get top 10 institutions
             const topInstitutions = this.dataLoader.getTopInstitutions(
                 this.data.allResults,
                 this.currentDirection,
                 10
             );
+
+            // Get first and last institutions in each category (А, Б, В) for heatmap
+            const categoryInstitutions = [];
+            const directionResults = this.data.allResults.filter(inst => {
+                const direction = inst['Напрям'] || inst['Категорія'] || '';
+                return direction.includes(this.currentDirection);
+            });
+
+            // Group by category (А, Б, В)
+            const groupsByCategory = {
+                'А': [],
+                'Б': [],
+                'В': []
+            };
+
+            directionResults.forEach(inst => {
+                const group = inst['Група'];
+                if (groupsByCategory[group]) {
+                    groupsByCategory[group].push(inst);
+                }
+            });
+
+            // Sort each group by score and get first and last
+            ['А', 'Б', 'В'].forEach(category => {
+                const institutions = groupsByCategory[category];
+                if (institutions.length > 0) {
+                    // Sort by score descending
+                    institutions.sort((a, b) => {
+                        const scoreA = a['Попередня атестаційна оцінка'] || a['Атестаційна оцінка'] || 0;
+                        const scoreB = b['Попередня атестаційна оцінка'] || b['Атестаційна оцінка'] || 0;
+                        return scoreB - scoreA;
+                    });
+
+                    // Add first (highest score)
+                    categoryInstitutions.push(institutions[0]);
+
+                    // Add last (lowest score) if different from first
+                    if (institutions.length > 1) {
+                        categoryInstitutions.push(institutions[institutions.length - 1]);
+                    }
+                }
+            });
+
+            // Add category institutions to comparison data
+            categoryInstitutions.forEach(inst => {
+                const instName = inst['Назва Установи / Середньорічні показники'] ||
+                                inst['Назва установи / Закладу вищої освіти'];
+                const group = inst['Група'] || '?';
+
+                // Check if not already in compareData
+                const alreadyExists = compareData.some(comp => comp.name === instName);
+                if (!alreadyExists) {
+                    const indicators = this.dataLoader.getIndicators(instName, this.data.detali);
+                    const blockScores = this.dataLoader.calculateBlockScores(
+                        indicators,
+                        this.data.methodology
+                    );
+                    compareData.push({
+                        name: `${instName} (${group})`,
+                        indicators: indicators,
+                        blockScores: blockScores
+                    });
+                }
+            });
 
             // Get indicators for top institutions
             const topInstitutionsWithIndicators = topInstitutions.map(inst => {
@@ -240,7 +304,8 @@ class App {
                 compareData,
                 medianValues,
                 topInstitutionsWithIndicators,
-                orderedIndicatorKeys
+                orderedIndicatorKeys,
+                categoryInstitutions
             );
 
             // Generate recommendations
@@ -329,7 +394,7 @@ class App {
     /**
      * Create all visualizations
      */
-    createVisualizations(mainData, indicators, blockScores, compareData, medianValues, topInstitutions, orderedIndicatorKeys) {
+    createVisualizations(mainData, indicators, blockScores, compareData, medianValues, topInstitutions, orderedIndicatorKeys, categoryInstitutions = []) {
         // Radar Chart
         const radarCanvas = document.getElementById('radarChart');
         if (radarCanvas) {
@@ -349,19 +414,8 @@ class App {
                 compareData,
                 this.data.methodology,
                 barCanvas,
-                orderedIndicatorKeys
-            );
-        }
-
-        // Median Comparison Bar Chart
-        const medianCanvas = document.getElementById('medianComparisonChart');
-        if (medianCanvas) {
-            this.charts.createMedianComparisonChart(
-                indicators,
-                medianValues,
-                this.data.methodology,
-                medianCanvas,
                 orderedIndicatorKeys,
+                medianValues,
                 (key) => this.getIndicatorName(key)
             );
         }
@@ -436,6 +490,25 @@ class App {
                     // Mark as comparison if already in map
                     const existing = allInstitutionsMap.get(compName);
                     existing.isComparison = true;
+                }
+            });
+
+            // Add first and last institutions from each category
+            categoryInstitutions.forEach(inst => {
+                const instName = inst['Назва Установи / Середньорічні показники'] ||
+                                inst['Назва установи / Закладу вищої освіти'];
+                if (!allInstitutionsMap.has(instName)) {
+                    const indicators = this.dataLoader.getIndicators(instName, this.data.detali);
+                    const score = inst['Попередня атестаційна оцінка'] || inst['Атестаційна оцінка'] || 0;
+                    const group = inst['Група'] || '?';
+                    allInstitutionsMap.set(instName, {
+                        name: instName,
+                        indicators: indicators,
+                        score: score,
+                        group: group,
+                        isMain: false,
+                        isComparison: false
+                    });
                 }
             });
 
@@ -516,6 +589,16 @@ class App {
             const contribution = normalizedValue * weight;
 
             const row = tbody.insertRow();
+
+            // Add background color based on comparison with median
+            if (median !== null && median !== undefined && median !== 0) {
+                if (value > median) {
+                    row.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'; // Light green for above median
+                } else if (value < median) {
+                    row.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; // Light red for below median
+                }
+            }
+
             row.innerHTML = `
                 <td><strong>${key}</strong></td>
                 <td>${this.getIndicatorName(key)}</td>
@@ -535,7 +618,7 @@ class App {
      */
     getIndicatorName(indicator) {
         if (!this.data || !this.data.detali) {
-            return indicator;
+            return '';
         }
 
         // Find the first occurrence of this indicator in detali data
@@ -552,10 +635,18 @@ class App {
             // Extract the descriptive part (without the indicator code)
             const fullName = detaliItem['Назва показника'];
             // Remove the indicator code pattern (e.g., "П6, І3" or "І15")
-            return fullName.replace(/[ПРФ]?\d+,?\s*[ІI]\d+/g, '').replace(/[ІI]\d+/g, '').trim();
+            let cleaned = fullName
+                .replace(/[ПРФ]?\d+,?\s*[ІI]\d+/g, '')
+                .replace(/^[ІI]\d+\.?\s*/g, '')  // Remove indicator at the start
+                .replace(/[,\s]+$/, '')  // Remove trailing commas/spaces
+                .replace(/^[,\s]+/, '')  // Remove leading commas/spaces
+                .trim();
+
+            // If cleaning resulted in empty string, return the full name
+            return cleaned || fullName;
         }
 
-        return indicator;
+        return '';
     }
 
     /**

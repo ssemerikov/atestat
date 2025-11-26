@@ -10,6 +10,10 @@
     height: 600px;
 }
 
+.chart-container-radar {
+    height: 800px;
+}
+
 .chart-container-heatmap {
     position: relative;
     width: 100%;

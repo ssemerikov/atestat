@@ -8,7 +8,6 @@ class Charts {
         this.radarChart = null;
         this.barChart = null;
         this.dynamicsChart = null;
-        this.medianComparisonChart = null;
         this.colors = [
             '#2563eb',
             '#7c3aed',
@@ -135,7 +134,7 @@ class Charts {
     /**
      * Create bar chart for all indicators
      */
-    createBarChart(indicators, compareData, methodology, canvas, orderedIndicatorKeys = null) {
+    createBarChart(indicators, compareData, methodology, canvas, orderedIndicatorKeys = null, medianValues = null, getIndicatorName = null) {
         // Destroy existing chart
         if (this.barChart) {
             this.barChart.destroy();
@@ -153,13 +152,45 @@ class Charts {
 
         const datasets = [];
 
-        // Main institution dataset
+        // Main institution dataset - determine colors based on median comparison
         const mainData = indicatorKeys.map(key => indicators[key] || 0);
+
+        // Determine bar colors based on median comparison
+        const barColors = indicatorKeys.map(key => {
+            if (!medianValues || medianValues[key] === null || medianValues[key] === undefined || medianValues[key] === 0) {
+                return '#2563eb'; // Default blue if no median data
+            }
+            const value = indicators[key];
+            const median = medianValues[key];
+            if (value > median) {
+                return '#10b981'; // Green for above median
+            } else if (value < median) {
+                return '#ef4444'; // Red for below median
+            } else {
+                return '#2563eb'; // Blue if equal
+            }
+        });
+
+        const barBorderColors = indicatorKeys.map(key => {
+            if (!medianValues || medianValues[key] === null || medianValues[key] === undefined || medianValues[key] === 0) {
+                return '#1e40af'; // Default blue border
+            }
+            const value = indicators[key];
+            const median = medianValues[key];
+            if (value > median) {
+                return '#059669'; // Dark green border
+            } else if (value < median) {
+                return '#dc2626'; // Dark red border
+            } else {
+                return '#1e40af'; // Blue border if equal
+            }
+        });
+
         datasets.push({
             label: 'Основний ЗВО',
             data: mainData,
-            backgroundColor: '#2563eb',
-            borderColor: '#1e40af',
+            backgroundColor: barColors,
+            borderColor: barBorderColors,
             borderWidth: 1
         });
 
@@ -238,14 +269,70 @@ class Charts {
                             title: function (context) {
                                 const indicator = context[0].label;
                                 const weight = methodology.indicators[indicator];
-                                return `${indicator} (Вага: ${weight})`;
+                                const indicatorName = getIndicatorName ? getIndicatorName(indicator) : '';
+                                const fullName = indicatorName && indicatorName !== indicator && indicatorName.trim() !== ''
+                                    ? `${indicator} - ${indicatorName}`
+                                    : indicator;
+                                return `${fullName}\n(Вага: ${weight})`;
                             },
                             label: function (context) {
                                 return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+                            },
+                            afterLabel: function(context) {
+                                const indicator = context.label;
+                                if (medianValues && medianValues[indicator] !== null && medianValues[indicator] !== undefined) {
+                                    return `Медіана: ${medianValues[indicator].toFixed(4)}`;
+                                }
+                                return '';
                             }
                         }
                     }
-                }
+                },
+                // Custom plugin to draw median comparison indicators
+                plugins: [{
+                    id: 'medianIndicators',
+                    afterDatasetsDraw: function(chart) {
+                        if (!medianValues) return;
+
+                        const ctx = chart.ctx;
+                        const xScale = chart.scales.x;
+                        const yScale = chart.scales.y;
+
+                        chart.data.datasets.forEach((dataset, datasetIndex) => {
+                            // Only show indicators for the first dataset (main institution)
+                            if (datasetIndex !== 0) return;
+
+                            const meta = chart.getDatasetMeta(datasetIndex);
+                            meta.data.forEach((bar, index) => {
+                                const indicator = indicatorKeys[index];
+                                const value = indicators[indicator];
+                                const median = medianValues[indicator];
+
+                                // Skip if no median data or median is 0
+                                if (median === null || median === undefined || median === 0) return;
+
+                                const x = bar.x;
+                                const y = bar.y;
+
+                                ctx.save();
+                                ctx.font = 'bold 16px Arial';
+                                ctx.textAlign = 'center';
+
+                                if (value > median) {
+                                    // Green up arrow for above median
+                                    ctx.fillStyle = '#10b981';
+                                    ctx.fillText('▲', x, y - 10);
+                                } else if (value < median) {
+                                    // Red down arrow for below median
+                                    ctx.fillStyle = '#ef4444';
+                                    ctx.fillText('▼', x, y - 10);
+                                }
+
+                                ctx.restore();
+                            });
+                        });
+                    }
+                }]
             }
         });
 
@@ -514,220 +601,6 @@ class Charts {
     }
 
     /**
-     * Create bar chart for median comparison with median lines
-     */
-    createMedianComparisonChart(indicators, medianValues, methodology, canvas, orderedIndicatorKeys = null, getIndicatorName = null) {
-        // Destroy existing chart
-        if (this.medianComparisonChart) {
-            this.medianComparisonChart.destroy();
-        }
-
-        // Use ordered keys if provided
-        const indicatorKeys = orderedIndicatorKeys && orderedIndicatorKeys.length > 0
-            ? orderedIndicatorKeys
-            : Object.keys(methodology.indicators)
-                .filter(key => indicators[key] !== null && indicators[key] !== undefined)
-                .sort();
-
-        // Prepare data
-        const labels = indicatorKeys.map(key => {
-            if (!getIndicatorName) return key;
-            const name = getIndicatorName(key);
-            if (name && name !== key) {
-                const shortName = name.length > 20 ? name.substring(0, 17) + '...' : name;
-                return `${key}\n${shortName}`;
-            }
-            return key;
-        });
-
-        const institutionValuesRaw = indicatorKeys.map(key => indicators[key] || 0);
-        const medianValuesData = indicatorKeys.map(key => medianValues[key] || 0);
-
-        // Transform values to percentage of median
-        const institutionValues = indicatorKeys.map((key, index) => {
-            const value = institutionValuesRaw[index];
-            const median = medianValuesData[index];
-            if (median === 0) return 0;
-            return (value / median) * 100; // Show as percentage of median
-        });
-
-        // Median is always at 100%
-        const medianPercentage = 100;
-
-        // Calculate max for better visualization
-        const maxPercentage = Math.max(...institutionValues);
-        const suggestedMax = maxPercentage > 200 ? maxPercentage * 1.1 : 200;
-
-        // Determine bar colors based on comparison with median (100%)
-        const barColors = indicatorKeys.map((key, index) => {
-            const percentValue = institutionValues[index];
-            if (percentValue >= 100) {
-                return '#10b981'; // Green for above median
-            } else {
-                return '#ef4444'; // Red for below median
-            }
-        });
-
-        const barBorderColors = indicatorKeys.map((key, index) => {
-            const percentValue = institutionValues[index];
-            if (percentValue >= 100) {
-                return '#059669';
-            } else {
-                return '#dc2626';
-            }
-        });
-
-        // Create chart
-        const ctx = canvas.getContext('2d');
-        this.medianComparisonChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Значення ЗВО',
-                        data: institutionValues,
-                        backgroundColor: barColors,
-                        borderColor: barBorderColors,
-                        borderWidth: 2
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: 'var(--text-secondary)',
-                            font: {
-                                size: 10
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        max: suggestedMax,
-                        ticks: {
-                            color: 'var(--text-secondary)',
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
-                        grid: {
-                            color: 'var(--border-color)'
-                        },
-                        title: {
-                            display: true,
-                            text: '% від медіани',
-                            color: 'var(--text-primary)',
-                            font: {
-                                size: 12,
-                                weight: 'bold'
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: 'var(--text-primary)',
-                            padding: 15,
-                            font: {
-                                size: 12
-                            },
-                            generateLabels: function(chart) {
-                                return [
-                                    {
-                                        text: 'Значення ЗВО (зелений = вище медіани, червоний = нижче)',
-                                        fillStyle: '#6b7280',
-                                        strokeStyle: '#6b7280',
-                                        lineWidth: 2,
-                                        hidden: false
-                                    },
-                                    {
-                                        text: 'Медіана (помаранчева лінія)',
-                                        fillStyle: '#f59e0b',
-                                        strokeStyle: '#f59e0b',
-                                        lineWidth: 3,
-                                        hidden: false
-                                    }
-                                ];
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        titleColor: '#1f2937',
-                        bodyColor: '#4b5563',
-                        borderColor: '#d1d5db',
-                        borderWidth: 1,
-                        padding: 12,
-                        displayColors: true,
-                        callbacks: {
-                            label: function(context) {
-                                const index = context.dataIndex;
-                                const valueRaw = institutionValuesRaw[index];
-                                const median = medianValuesData[index];
-                                const percentValue = institutionValues[index];
-                                const diff = valueRaw - median;
-
-                                return [
-                                    `Відносно медіани: ${percentValue.toFixed(1)}%`,
-                                    `─────────────────`,
-                                    `Значення ЗВО: ${valueRaw.toFixed(4)}`,
-                                    `Медіана: ${median.toFixed(4)}`,
-                                    `Різниця: ${diff >= 0 ? '+' : ''}${diff.toFixed(4)}`
-                                ];
-                            }
-                        }
-                    }
-                },
-                // Custom plugin to draw median line at 100%
-                plugins: [{
-                    id: 'medianLine',
-                    afterDatasetsDraw: function(chart) {
-                        const ctx = chart.ctx;
-                        const chartArea = chart.chartArea;
-                        const yScale = chart.scales.y;
-                        const yPos = yScale.getPixelForValue(medianPercentage);
-
-                        ctx.save();
-                        ctx.strokeStyle = '#f59e0b';
-                        ctx.lineWidth = 3;
-                        ctx.setLineDash([5, 5]);
-
-                        // Draw horizontal line across entire chart at 100%
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, yPos);
-                        ctx.lineTo(chartArea.right, yPos);
-                        ctx.stroke();
-
-                        // Add label
-                        ctx.fillStyle = '#f59e0b';
-                        ctx.font = 'bold 12px sans-serif';
-                        ctx.textAlign = 'right';
-                        ctx.fillText('← Медіана (100%)', chartArea.right - 5, yPos - 5);
-
-                        ctx.restore();
-                    }
-                }]
-            }
-        });
-
-        return this.medianComparisonChart;
-    }
-
-    /**
      * Destroy all charts
      */
     destroyAll() {
@@ -742,10 +615,6 @@ class Charts {
         if (this.dynamicsChart) {
             this.dynamicsChart.destroy();
             this.dynamicsChart = null;
-        }
-        if (this.medianComparisonChart) {
-            this.medianComparisonChart.destroy();
-            this.medianComparisonChart = null;
         }
     }
 }
