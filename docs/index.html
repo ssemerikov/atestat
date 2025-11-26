@@ -113,22 +113,10 @@
 
                 <!-- Bar Chart - All Indicators -->
                 <div class="card">
-                    <h2>Всі 37 індикаторів</h2>
+                    <h2>Індикатори, за якими є дані</h2>
                     <div class="chart-container chart-container-large">
                         <canvas id="barChart"></canvas>
                     </div>
-                </div>
-
-                <!-- Scatter Plot - Position vs Median -->
-                <div class="card">
-                    <h2>Позиція відносно медіани</h2>
-                    <div id="scatterPlot" class="chart-container"></div>
-                </div>
-
-                <!-- Heatmap - Top 10 Institutions -->
-                <div class="card">
-                    <h2>Теплова карта: Топ-10 ЗВО</h2>
-                    <div id="heatmap" class="chart-container-heatmap"></div>
                 </div>
 
                 <!-- Detailed Table -->
@@ -141,6 +129,7 @@
                                     <th>Індикатор</th>
                                     <th>Назва</th>
                                     <th>Значення</th>
+                                    <th>Медіана</th>
                                     <th>Нормоване значення</th>
                                     <th>Вага (Кi)</th>
                                     <th>Внесок</th>
@@ -148,6 +137,28 @@
                             </thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Bar Chart - Position vs Median -->
+                <div class="card">
+                    <h2>Порівняння з медіаною</h2>
+                    <div class="chart-container chart-container-large">
+                        <canvas id="medianComparisonChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Heatmap - Top 10 Institutions -->
+                <div class="card">
+                    <h2>Теплова карта: Топ-10 ЗВО</h2>
+                    <div id="heatmap" class="chart-container-heatmap"></div>
+                </div>
+
+                <!-- Time Series - Dynamics -->
+                <div class="card">
+                    <h2>Динаміка показників по роках (2019-2023)</h2>
+                    <div class="chart-container">
+                        <canvas id="dynamicsChart"></canvas>
                     </div>
                 </div>
 
@@ -174,8 +185,29 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2025 Аналіз атестації ЗВО України</p>
-            <p>Дані оновлено: <span id="dataUpdateDate">-</span></p>
+            <div class="footer-section">
+                <h3>Аналітичні документи</h3>
+                <ul class="footer-links">
+                    <li><a href="https://github.com/yourusername/atestat/blob/master/docs/analysis/01_zagalna_struktura.md" target="_blank">📊 Загальна структура атестаційної оцінки</a></li>
+                    <li><a href="https://github.com/yourusername/atestat/blob/master/docs/analysis/02_indykatory_detalno.md" target="_blank">📋 Детальний опис всіх 37 індикаторів</a></li>
+                    <li><a href="https://github.com/yourusername/atestat/blob/master/docs/analysis/03_vnesok_indykatoriv.md" target="_blank">📈 Розрахунок внеску кожного індикатора</a></li>
+                    <li><a href="https://github.com/yourusername/atestat/blob/master/docs/analysis/04_rekomendatsii.md" target="_blank">💡 Рекомендації для підвищення атестаційної оцінки</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-section">
+                <h3>Про проєкт</h3>
+                <p><strong>Автори:</strong> В. А. Гаманюк, С. О. Семеріков<br>
+                <strong>Організація:</strong> Криворізький державний педагогічний університет</p>
+                <p><strong>Джерело даних:</strong> <a href="https://atestat.nauka.gov.ua/uk/atestat-2025" target="_blank">Державна атестація наукових установ та ЗВО (МОН України)</a></p>
+                <p><strong>Розроблено за допомогою:</strong> <a href="https://claude.ai/code" target="_blank">Claude Code</a></p>
+                <p class="footer-note">⚠️ Для отримання повних офіційних даних звертайтесь до МОН України</p>
+            </div>
+
+            <div class="footer-section">
+                <p>&copy; 2025 Аналіз атестації ЗВО України</p>
+                <p>Дані оновлено: <span id="dataUpdateDate">-</span></p>
+            </div>
         </div>
     </footer>
 

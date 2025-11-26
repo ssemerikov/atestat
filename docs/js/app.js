@@ -211,28 +211,37 @@ class App {
                 this.currentDirection
             );
 
-            // Get top institutions
+            // Get top institutions with their indicators
             const topInstitutions = this.dataLoader.getTopInstitutions(
                 this.data.allResults,
                 this.currentDirection,
                 10
             );
 
+            // Get indicators for top institutions
+            const topInstitutionsWithIndicators = topInstitutions.map(inst => {
+                const name = inst['Назва Установи / Середньорічні показники'] ||
+                            inst['Назва установи / Закладу вищої освіти'];
+                const indicators = this.dataLoader.getIndicators(name, this.data.detali);
+                return { name, indicators };
+            });
+
             // Display institution info
             this.displayInstitutionInfo(mainData);
 
-            // Create visualizations
+            // Create details table first to establish indicator order
+            const orderedIndicatorKeys = this.createDetailsTable(mainData, indicators, this.data.methodology, medianValues);
+
+            // Create visualizations with ordered indicators
             this.createVisualizations(
                 mainData,
                 indicators,
                 blockScores,
                 compareData,
                 medianValues,
-                topInstitutions
+                topInstitutionsWithIndicators,
+                orderedIndicatorKeys
             );
-
-            // Create details table
-            this.createDetailsTable(mainData, indicators, this.data.methodology);
 
             // Generate recommendations
             this.generateRecommendations(
@@ -268,7 +277,7 @@ class App {
         container.innerHTML = `
             <div class="info-item">
                 <div class="label">Назва закладу</div>
-                <div class="value">${data['Назва установи / Закладу вищої освіти'] || 'Н/Д'}</div>
+                <div class="value">${data['Назва Установи / Середньорічні показники'] || data['Назва установи / Закладу вищої освіти'] || 'Н/Д'}</div>
             </div>
             <div class="info-item">
                 <div class="label">Регіон</div>
@@ -320,7 +329,7 @@ class App {
     /**
      * Create all visualizations
      */
-    createVisualizations(mainData, indicators, blockScores, compareData, medianValues, topInstitutions) {
+    createVisualizations(mainData, indicators, blockScores, compareData, medianValues, topInstitutions, orderedIndicatorKeys) {
         // Radar Chart
         const radarCanvas = document.getElementById('radarChart');
         if (radarCanvas) {
@@ -332,77 +341,218 @@ class App {
             );
         }
 
-        // Bar Chart
+        // Bar Chart with ordered indicators
         const barCanvas = document.getElementById('barChart');
         if (barCanvas) {
             this.charts.createBarChart(
                 indicators,
                 compareData,
                 this.data.methodology,
-                barCanvas
+                barCanvas,
+                orderedIndicatorKeys
             );
         }
 
-        // Scatter Plot
-        const scatterContainer = document.getElementById('scatterPlot');
-        if (scatterContainer) {
-            this.visualizations.createScatterPlot(
-                { main: mainData },
+        // Median Comparison Bar Chart
+        const medianCanvas = document.getElementById('medianComparisonChart');
+        if (medianCanvas) {
+            this.charts.createMedianComparisonChart(
+                indicators,
                 medianValues,
                 this.data.methodology,
-                scatterContainer
+                medianCanvas,
+                orderedIndicatorKeys,
+                (key) => this.getIndicatorName(key)
             );
         }
 
-        // Heatmap
+        // Heatmap with all relevant institutions (main, top 10, and comparison)
         const heatmapContainer = document.getElementById('heatmap');
         if (heatmapContainer) {
+            const mainInstitutionName = mainData['Назва Установи / Середньорічні показники'] ||
+                                       mainData['Назва установи / Закладу вищої освіти'];
+
+            // Get comparison names
+            const comparisonNames = compareData.map(comp => comp.name);
+
+            // Collect all institutions to include
+            const allInstitutionsMap = new Map();
+
+            // Add main institution
+            const mainScore = mainData['Попередня атестаційна оцінка'] || mainData['Атестаційна оцінка'] || 0;
+            const mainGroup = mainData['Група'] || '?';
+            allInstitutionsMap.set(mainInstitutionName, {
+                name: mainInstitutionName,
+                indicators: indicators,
+                score: mainScore,
+                group: mainGroup,
+                isMain: true,
+                isComparison: false
+            });
+
+            // Add top 10 institutions
+            topInstitutions.forEach(inst => {
+                if (!allInstitutionsMap.has(inst.name)) {
+                    const instData = this.dataLoader.getInstitutionData(
+                        this.data.allResults,
+                        inst.name,
+                        this.currentDirection
+                    )[0];
+                    const score = instData ? (instData['Попередня атестаційна оцінка'] || instData['Атестаційна оцінка'] || 0) : 0;
+                    const group = instData ? (instData['Група'] || '?') : '?';
+                    allInstitutionsMap.set(inst.name, {
+                        name: inst.name,
+                        indicators: inst.indicators,
+                        score: score,
+                        group: group,
+                        isMain: false,
+                        isComparison: false
+                    });
+                }
+            });
+
+            // Add comparison institutions
+            comparisonNames.forEach(compName => {
+                if (!allInstitutionsMap.has(compName)) {
+                    const compInst = compareData.find(c => c.name === compName);
+                    const instData = this.dataLoader.getInstitutionData(
+                        this.data.allResults,
+                        compName,
+                        this.currentDirection
+                    )[0];
+                    const score = instData ? (instData['Попередня атестаційна оцінка'] || instData['Атестаційна оцінка'] || 0) : 0;
+                    const group = instData ? (instData['Група'] || '?') : '?';
+                    if (compInst) {
+                        allInstitutionsMap.set(compName, {
+                            name: compName,
+                            indicators: compInst.indicators,
+                            score: score,
+                            group: group,
+                            isMain: false,
+                            isComparison: true
+                        });
+                    }
+                } else {
+                    // Mark as comparison if already in map
+                    const existing = allInstitutionsMap.get(compName);
+                    existing.isComparison = true;
+                }
+            });
+
+            // Convert to array and sort by score descending
+            const allInstitutionsArray = Array.from(allInstitutionsMap.values())
+                .sort((a, b) => b.score - a.score);
+
             this.visualizations.createHeatmap(
-                topInstitutions,
+                allInstitutionsArray,
                 this.data.methodology,
-                heatmapContainer
+                heatmapContainer,
+                orderedIndicatorKeys,
+                (key) => this.getIndicatorName(key)
+            );
+        }
+
+        // Dynamics Chart with comparison institutions
+        const dynamicsCanvas = document.getElementById('dynamicsChart');
+        if (dynamicsCanvas) {
+            const mainInstitutionName = mainData['Назва Установи / Середньорічні показники'] ||
+                                       mainData['Назва установи / Закладу вищої освіти'];
+            const mainScore = mainData['Попередня атестаційна оцінка'] || mainData['Атестаційна оцінка'] || 0;
+            const mainGroup = mainData['Група'] || '?';
+
+            // Get names and scores of comparison institutions
+            const comparisonWithScores = compareData.map(comp => {
+                const compInstData = this.dataLoader.getInstitutionData(
+                    this.data.allResults,
+                    comp.name,
+                    this.currentDirection
+                )[0];
+                const score = compInstData ? (compInstData['Попередня атестаційна оцінка'] || compInstData['Атестаційна оцінка'] || 0) : 0;
+                const group = compInstData ? (compInstData['Група'] || '?') : '?';
+                return { name: comp.name, score, group };
+            });
+
+            this.charts.createDynamicsChart(
+                { name: mainInstitutionName, score: mainScore, group: mainGroup },
+                this.data.dynamika,
+                dynamicsCanvas,
+                comparisonWithScores
             );
         }
     }
 
     /**
-     * Create details table
+     * Create details table and return ordered indicator keys
      */
-    createDetailsTable(mainData, indicators, methodology) {
+    createDetailsTable(mainData, indicators, methodology, medianValues) {
         const tbody = document.querySelector('#detailsTable tbody');
-        if (!tbody) return;
+        if (!tbody) return [];
 
         tbody.innerHTML = '';
 
+        // Create array of indicators with their data
+        const indicatorArray = [];
         Object.entries(methodology.indicators).forEach(([key, weight]) => {
             const value = indicators[key];
+
+            // Skip indicators with no data (null or undefined)
+            if (value === null || value === undefined) {
+                return;
+            }
+
+            const median = medianValues[key] || null;
+            indicatorArray.push({ key, value, weight, median });
+        });
+
+        // Sort by contribution (value * weight) descending
+        indicatorArray.sort((a, b) => (b.value * b.weight) - (a.value * a.weight));
+
+        // Store the ordered keys for use in other visualizations
+        this.orderedIndicatorKeys = indicatorArray.map(item => item.key);
+
+        // Create table rows
+        indicatorArray.forEach(({ key, value, weight, median }) => {
             const normalizedValue = value !== null ? value : 0;
             const contribution = normalizedValue * weight;
 
             const row = tbody.insertRow();
             row.innerHTML = `
                 <td><strong>${key}</strong></td>
-                <td>${this.getIndicatorName(key, mainData)}</td>
+                <td>${this.getIndicatorName(key)}</td>
                 <td>${value !== null ? value.toFixed(4) : 'Н/Д'}</td>
+                <td>${median !== null ? median.toFixed(4) : 'Н/Д'}</td>
                 <td>${normalizedValue.toFixed(4)}</td>
                 <td>${weight}</td>
                 <td>${contribution.toFixed(4)}</td>
             `;
         });
+
+        return this.orderedIndicatorKeys;
     }
 
     /**
-     * Get indicator name from data
+     * Get indicator name from detali data
      */
-    getIndicatorName(indicator, data) {
-        const key = Object.keys(data).find(k =>
-            k.includes(`Індикатор ${indicator} `) ||
-            k.includes(`Нормований індикатор ${indicator}*`)
-        );
+    getIndicatorName(indicator) {
+        if (!this.data || !this.data.detali) {
+            return indicator;
+        }
 
-        if (key) {
-            const parts = key.split(' ');
-            return parts.slice(2).join(' ');
+        // Find the first occurrence of this indicator in detali data
+        const detaliItem = this.data.detali.find(item => {
+            const indicatorName = item['Назва показника'];
+            if (!indicatorName) return false;
+
+            // Match indicator pattern (e.g., "І3" or "I3")
+            const match = indicatorName.match(/[ІI](\d+)/);
+            return match && `I${match[1]}` === indicator;
+        });
+
+        if (detaliItem && detaliItem['Назва показника']) {
+            // Extract the descriptive part (without the indicator code)
+            const fullName = detaliItem['Назва показника'];
+            // Remove the indicator code pattern (e.g., "П6, І3" or "І15")
+            return fullName.replace(/[ПРФ]?\d+,?\s*[ІI]\d+/g, '').replace(/[ІI]\d+/g, '').trim();
         }
 
         return indicator;

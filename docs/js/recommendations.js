@@ -52,7 +52,13 @@ class Recommendations {
         const weakIndicators = [];
 
         blockIndicators.forEach(indicatorKey => {
-            const value = indicators[indicatorKey] || 0;
+            const value = indicators[indicatorKey];
+
+            // Skip indicators with no data (null or undefined)
+            if (value === null || value === undefined) {
+                return;
+            }
+
             const median = medianValues[indicatorKey] || 0;
             const weight = methodology.indicators[indicatorKey];
 

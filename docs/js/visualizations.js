@@ -18,35 +18,44 @@ class Visualizations {
     /**
      * Create scatter plot: position vs median
      */
-    createScatterPlot(data, medianValues, methodology, container) {
+    createScatterPlot(data, indicators, medianValues, methodology, container, orderedIndicatorKeys = null, getIndicatorName = null) {
         // Clear container
         d3.select(container).selectAll('*').remove();
 
-        // Prepare data points
+        // Prepare data points from indicators
         const points = [];
-        const mainInstitution = data.main;
 
-        for (let i = 1; i <= 37; i++) {
-            const indicatorKey = `I${i}`;
-            const dataKey = Object.keys(mainInstitution).find(key =>
-                key.includes(`Нормований індикатор ${indicatorKey}*`)
-            );
+        // Use ordered keys if provided, otherwise use all keys
+        const keysToUse = orderedIndicatorKeys && orderedIndicatorKeys.length > 0
+            ? orderedIndicatorKeys
+            : Object.keys(indicators);
 
-            if (dataKey) {
-                const value = mainInstitution[dataKey];
-                const median = medianValues[indicatorKey];
+        keysToUse.forEach(indicatorKey => {
+            const value = indicators[indicatorKey];
 
-                if (value !== null && !isNaN(value) && median !== null && !isNaN(median)) {
-                    points.push({
-                        indicator: indicatorKey,
-                        value: value,
-                        median: median,
-                        diff: value - median,
-                        weight: methodology.indicators[indicatorKey]
-                    });
-                }
+            // Skip indicators with no data
+            if (value === null || value === undefined) {
+                return;
             }
-        }
+
+            const median = medianValues[indicatorKey];
+
+            if (median !== null && median !== undefined && !isNaN(value) && !isNaN(median)) {
+                const indicatorName = getIndicatorName ? getIndicatorName(indicatorKey) : indicatorKey;
+                const displayName = indicatorName && indicatorName !== indicatorKey
+                    ? `${indicatorKey} - ${indicatorName.substring(0, 30)}${indicatorName.length > 30 ? '...' : ''}`
+                    : indicatorKey;
+
+                points.push({
+                    indicator: indicatorKey,
+                    displayName: displayName,
+                    value: value,
+                    median: median,
+                    diff: value - median,
+                    weight: methodology.indicators[indicatorKey]
+                });
+            }
+        });
 
         // Set dimensions
         const margin = { top: 40, right: 40, bottom: 60, left: 60 };
@@ -157,8 +166,8 @@ class Visualizations {
                     .style('opacity', 1);
 
                 tooltip.html(`
-                    <div class="tooltip-title">${d.indicator}</div>
-                    <div class="tooltip-content">
+                    <div class="tooltip-title">${d.displayName}</div>
+                    <div class="tooltip-content" style="background: rgba(255, 255, 255, 0.95); color: #1f2937; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px;">
                         <div class="tooltip-row">
                             <span class="tooltip-label">Значення:</span>
                             <span class="tooltip-value">${d.value.toFixed(2)}</span>
@@ -206,13 +215,13 @@ class Visualizations {
     }
 
     /**
-     * Create heatmap for top 10 institutions
+     * Create heatmap for institutions with indicators
      */
-    createHeatmap(topInstitutions, methodology, container) {
+    createHeatmap(topInstitutionsData, methodology, container, orderedIndicatorKeys = null, getIndicatorName = null) {
         // Clear container
         d3.select(container).selectAll('*').remove();
 
-        if (topInstitutions.length === 0) {
+        if (!topInstitutionsData || topInstitutionsData.length === 0) {
             d3.select(container)
                 .append('p')
                 .style('text-align', 'center')
@@ -221,35 +230,48 @@ class Visualizations {
             return;
         }
 
-        // Prepare data
-        const indicators = Object.keys(methodology.indicators);
-        const institutions = topInstitutions.map(d =>
-            d['Назва Установи / Середньорічні показники'] ||
-            d['Назва установи / Закладу вищої освіти'] ||
-            'Невідомо'
-        );
-
+        // Prepare data from institutions with indicators
         const heatmapData = [];
-        topInstitutions.forEach((inst, i) => {
-            indicators.forEach(indicator => {
-                const dataKey = Object.keys(inst).find(key =>
-                    key.includes(`Нормований індикатор ${indicator}*`)
-                );
+        const institutionNames = [];
+        const institutionScores = [];
 
-                if (dataKey) {
-                    const value = inst[dataKey];
-                    if (value !== null && !isNaN(value)) {
-                        heatmapData.push({
-                            institution: institutions[i],
-                            indicator: indicator,
-                            value: value
-                        });
-                    }
+        topInstitutionsData.forEach(instData => {
+            const institutionName = instData.name;
+            const indicators = instData.indicators;
+            const isMain = instData.isMain;
+            const isComparison = instData.isComparison;
+            const score = instData.score || 0;
+            const group = instData.group || '?';
+
+            if (!indicators) return;
+
+            // Add special prefix for main institution
+            let displayName = institutionName;
+            if (isMain) {
+                displayName = `★ ${institutionName}`;
+            } else if (isComparison) {
+                displayName = `◆ ${institutionName}`;
+            }
+
+            institutionNames.push(displayName);
+            institutionScores.push({ name: displayName, score: score, group: group });
+
+            Object.entries(indicators).forEach(([indicator, value]) => {
+                if (value !== null && value !== undefined && !isNaN(value)) {
+                    heatmapData.push({
+                        institution: displayName,
+                        indicator: indicator,
+                        value: value,
+                        isMain: isMain,
+                        isComparison: isComparison,
+                        score: score,
+                        group: group
+                    });
                 }
             });
         });
 
-        // If no data found (because all_results doesn't have indicators), show message
+        // If no data found, show message
         if (heatmapData.length === 0) {
             d3.select(container)
                 .append('p')
@@ -259,12 +281,24 @@ class Visualizations {
             return;
         }
 
+        // Use ordered keys if provided, otherwise use all unique indicators
+        let indicatorsWithData;
+        if (orderedIndicatorKeys && orderedIndicatorKeys.length > 0) {
+            // Filter to only indicators that have data
+            indicatorsWithData = orderedIndicatorKeys.filter(key =>
+                heatmapData.some(d => d.indicator === key)
+            );
+        } else {
+            indicatorsWithData = [...new Set(heatmapData.map(d => d.indicator))].sort();
+        }
+
         // Set dimensions
-        const margin = { top: 80, right: 40, bottom: 100, left: 250 };
-        const cellWidth = 25;
-        const cellHeight = 30;
-        const width = indicators.length * cellWidth;
-        const height = institutions.length * cellHeight;
+        const margin = { top: 60, right: 150, bottom: 60, left: 280 };
+        const cellWidth = 50;
+        const cellHeight = 35;
+        const scoreColumnWidth = 80;
+        const width = indicatorsWithData.length * cellWidth;
+        const height = institutionNames.length * cellHeight;
 
         // Create SVG
         const svg = d3.select(container)
@@ -276,12 +310,12 @@ class Visualizations {
 
         // Scales
         const xScale = d3.scaleBand()
-            .domain(indicators)
+            .domain(indicatorsWithData)
             .range([0, width])
             .padding(0.05);
 
         const yScale = d3.scaleBand()
-            .domain(institutions)
+            .domain(institutionNames)
             .range([0, height])
             .padding(0.05);
 
@@ -320,16 +354,23 @@ class Visualizations {
                     .duration(200)
                     .style('opacity', 1);
 
+                const indicatorName = getIndicatorName ? getIndicatorName(d.indicator) : d.indicator;
+                const displayName = indicatorName && indicatorName !== d.indicator
+                    ? `${d.indicator} - ${indicatorName}`
+                    : d.indicator;
+
                 tooltip.html(`
-                    <div class="tooltip-title">${d.indicator}</div>
-                    <div class="tooltip-content">
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">ЗВО:</span>
-                            <span class="tooltip-value">${d.institution}</span>
-                        </div>
-                        <div class="tooltip-row">
-                            <span class="tooltip-label">Значення:</span>
-                            <span class="tooltip-value">${d.value.toFixed(2)}</span>
+                    <div style="background: rgba(255, 255, 255, 0.95); color: #1f2937; border: 1px solid #d1d5db; padding: 8px; border-radius: 4px;">
+                        <div class="tooltip-title" style="font-weight: bold; margin-bottom: 4px;">${displayName}</div>
+                        <div class="tooltip-content">
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">ЗВО:</span>
+                                <span class="tooltip-value">${d.institution}</span>
+                            </div>
+                            <div class="tooltip-row">
+                                <span class="tooltip-label">Значення:</span>
+                                <span class="tooltip-value">${d.value.toFixed(2)}</span>
+                            </div>
                         </div>
                     </div>
                 `)
@@ -346,24 +387,25 @@ class Visualizations {
                     .style('opacity', 0);
             });
 
-        // Add x-axis
+        // Add x-axis with indicator codes only (horizontal)
         svg.append('g')
             .selectAll('text')
-            .data(indicators)
+            .data(indicatorsWithData)
             .enter()
             .append('text')
             .attr('class', 'indicator-label')
             .attr('x', d => xScale(d) + xScale.bandwidth() / 2)
             .attr('y', -10)
             .style('text-anchor', 'middle')
-            .style('font-size', '11px')
+            .style('font-size', '12px')
+            .style('font-weight', '600')
             .style('fill', 'var(--text-secondary)')
             .text(d => d);
 
         // Add y-axis
         svg.append('g')
             .selectAll('text')
-            .data(institutions)
+            .data(institutionNames)
             .enter()
             .append('text')
             .attr('class', 'institution-label')
@@ -378,6 +420,32 @@ class Visualizations {
                 if (!d) return '';
                 return d.length > 40 ? d.substring(0, 37) + '...' : d;
             });
+
+        // Add score column header
+        svg.append('text')
+            .attr('x', width + 20)
+            .attr('y', -10)
+            .style('text-anchor', 'start')
+            .style('font-size', '12px')
+            .style('font-weight', '600')
+            .style('fill', 'var(--text-secondary)')
+            .text('Оцінка (Група)');
+
+        // Add score column
+        svg.append('g')
+            .selectAll('text')
+            .data(institutionScores)
+            .enter()
+            .append('text')
+            .attr('class', 'score-label')
+            .attr('x', width + 20)
+            .attr('y', d => yScale(d.name) + yScale.bandwidth() / 2)
+            .style('text-anchor', 'start')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .style('fill', 'var(--text-primary)')
+            .style('alignment-baseline', 'middle')
+            .text(d => `${d.score.toFixed(1)} (${d.group})`);
 
         // Add legend
         this.addHeatmapLegend(container, colorScale, maxValue);
